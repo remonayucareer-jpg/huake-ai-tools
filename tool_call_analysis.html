@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>话务分析系统</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: "Microsoft YaHei",sans-serif; background: #f5f7fa; color: #333; padding: 20px; max-width: 1400px; margin: 0 auto; }
+.header { background: linear-gradient(135deg,#1a73e8,#0d47a1); color: #fff; padding: 24px 32px; border-radius: 12px; margin-bottom: 20px; }
+.header h1 { font-size: 22px; }
+.header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.upload-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.upload-box { flex: 1; min-width: 280px; background: #fff; border: 2px dashed #c8d6e5; border-radius: 10px; padding: 24px 20px; text-align: center; cursor: pointer; position: relative; transition: all 0.2s; }
+.upload-box:hover { border-color: #1a73e8; background: #e8f0fe; }
+.upload-box.has-file { border-color: #34a853; border-style: solid; background: #f0faf3; }
+.upload-box input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.upload-label { font-size: 15px; font-weight: 600; color: #444; }
+.upload-hint { font-size: 12px; color: #999; margin-top: 6px; }
+.file-name { font-size: 12px; color: #34a853; margin-top: 8px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+.btn-primary { background: #1a73e8; color: #fff; }
+.btn-primary:hover { background: #1557b0; }
+.btn-primary:disabled { background: #a0bcdb; cursor: not-allowed; }
+.btn-success { background: #34a853; color: #fff; }
+.btn-success:hover { background: #2d9249; }
+.btn-group { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.card { background: #fff; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 16px; }
+.card-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
+.metrics { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.metric { flex: 1; min-width: 160px; background: #f0f4ff; border-radius: 8px; padding: 16px; text-align: center; }
+.metric-value { font-size: 26px; font-weight: 700; color: #1a73e8; }
+.metric-label { font-size: 12px; color: #666; margin-top: 4px; }
+.chart-wrap { max-height: 400px; margin-bottom: 20px; }
+.table-wrap { max-height: 400px; overflow: auto; border: 1px solid #e0e4e8; border-radius: 8px; }
+.table-wrap table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.table-wrap th { background: #f1f3f4; padding: 8px 10px; font-weight: 600; position: sticky; top: 0; }
+.table-wrap td { padding: 6px 10px; border-top: 1px solid #eee; text-align: center; }
+.error-msg { color: #d93025; background: #fce8e6; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: none; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📞 话务数据多维分析报表</h1>
+  <p>上传云总机通话详单和分机对照表，自动生成分析报告</p>
+</div>
+
+<div class="upload-row">
+  <div class="upload-box" id="boxMain">
+    <div class="upload-label">📂 上传原始通话数据 (xlsx)</div>
+    <div class="upload-hint">云总机通话详单</div>
+    <input type="file" id="fileMain" accept=".xlsx">
+    <div class="file-name" id="nameMain"></div>
+  </div>
+  <div class="upload-box" id="boxExt">
+    <div class="upload-label">📂 上传分机对照表 (xlsx)</div>
+    <div class="upload-hint">需包含：分机描述、房间号、分机号</div>
+    <input type="file" id="fileExt" accept=".xlsx">
+    <div class="file-name" id="nameExt"></div>
+  </div>
+</div>
+
+<div class="btn-group">
+  <button class="btn btn-primary" id="btnRun" disabled onclick="runAnalysis()">🔍 开始分析</button>
+  <button class="btn btn-success hidden" id="btnDownload" onclick="downloadReport()">📥 下载分析报告</button>
+</div>
+
+<div class="error-msg" id="errorMsg"></div>
+
+<div class="hidden" id="results">
+  <div class="card">
+    <div class="card-title">📈 核心业务指标 (人工口径)</div>
+    <div class="metrics" id="metrics"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📊 各时段汇总趋势</div>
+    <div class="chart-wrap"><canvas id="chartHour"></canvas></div>
+    <div class="table-wrap" id="tableHourWrap"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📅 每日话务概览</div>
+    <div class="chart-wrap"><canvas id="chartDay"></canvas></div>
+    <div class="table-wrap" id="tableDayWrap"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🔍 每日分时段深度分析</div>
+    <div id="dailyDetail"></div>
+  </div>
+</div>
+
+<script>
+let mainFile = null, extFile = null;
+let analysisData = null;
+
+document.getElementById('fileMain').addEventListener('change',function(e){
+  if(e.target.files[0]){ mainFile=e.target.files[0]; document.getElementById('nameMain').textContent=mainFile.name; document.getElementById('boxMain').classList.add('has-file'); }
+  checkReady();
+});
+document.getElementById('fileExt').addEventListener('change',function(e){
+  if(e.target.files[0]){ extFile=e.target.files[0]; document.getElementById('nameExt').textContent=extFile.name; document.getElementById('boxExt').classList.add('has-file'); }
+  checkReady();
+});
+function checkReady(){ document.getElementById('btnRun').disabled = !(mainFile && extFile); }
+
+function readFile(file){
+  return new Promise(function(resolve,reject){
+    var reader=new FileReader();
+    reader.onload=function(e){ resolve(e.target.result); };
+    reader.onerror=function(){ reject(new Error('读取失败')); };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function runAnalysis(){
+  document.getElementById('errorMsg').style.display='none';
+  var btn=document.getElementById('btnRun'); btn.disabled=true; btn.textContent='分析中...';
+  try{
+    var mainBuf=await readFile(mainFile);
+    var mainWb=XLSX.read(mainBuf,{type:'array'});
+    var mainData=XLSX.utils.sheet_to_json(mainWb.Sheets[mainWb.SheetNames[0]],{header:1,defval:''});
+
+    var extBuf=await readFile(extFile);
+    var extWb=XLSX.read(extBuf,{type:'array'});
+    var extData=XLSX.utils.sheet_to_json(extWb.Sheets[extWb.SheetNames[0]],{header:1,defval:''});
+
+    // Parse extension table: find columns for room and extension number
+    var extHeader=extData[0].map(function(h){ return String(h).trim(); });
+    var extRoomCol=extHeader.findIndex(function(h){ return h.includes('房间号') || h.includes('房间'); });
+    var extNumCol=extHeader.findIndex(function(h){ return h.includes('分机号'); });
+    if(extNumCol<0) extNumCol=1;
+    var extSet=new Set();
+    for(var i=1;i<extData.length;i++){
+      var num=String(extData[i][extNumCol]||'').trim().split('.')[0];
+      if(num) extSet.add(num);
+    }
+
+    // Parse main data: find header row
+    var mainHeaderRow=-1;
+    for(var i=0;i<Math.min(mainData.length,30);i++){
+      var rs=mainData[i].join(' ');
+      if(rs.includes('主叫号码') && rs.includes('呼叫时间')){ mainHeaderRow=i; break; }
+    }
+    if(mainHeaderRow<0) throw new Error('未在通话详单中找到表头行（需包含：主叫号码、呼叫时间、人工通话状态）');
+
+    var header=mainData[mainHeaderRow].map(function(h){ return String(h).trim(); });
+    var colCallTime=header.findIndex(function(h){ return h.includes('呼叫时间'); });
+    var colCaller=header.findIndex(function(h){ return h.includes('主叫号码'); });
+    var colStatus=header.findIndex(function(h){ return h.includes('人工通话状态'); });
+    if(colCallTime<0||colCaller<0||colStatus<0) throw new Error('通话详单表头缺少必要列（主叫号码、呼叫时间、人工通话状态）');
+
+    // Process rows
+    var dailyMap={}, hourlyMap={};
+    for(var i=0;i<24;i++) hourlyMap[i]={conn:0,unconn:0,ai:0};
+    var uniqueDates=new Set();
+    var totalConn=0, totalUnconn=0;
+
+    for(var i=mainHeaderRow+1;i<mainData.length;i++){
+      var row=mainData[i];
+      var caller=String(row[colCaller]||'').trim().split('.')[0];
+      if(!extSet.has(caller)) continue;
+      var callTime=String(row[colCallTime]||'').trim();
+      var status=String(row[colStatus]||'').trim();
+      if(!callTime) continue;
+
+      var dt=parseCallTime(callTime);
+      if(!dt) continue;
+      var dateKey=fmtDate(dt);
+      var hour=dt.getHours();
+      uniqueDates.add(dateKey);
+
+      if(!dailyMap[dateKey]) dailyMap[dateKey]={conn:0,unconn:0,ai:0,hourly:{}};
+      if(!dailyMap[dateKey].hourly[hour]) dailyMap[dateKey].hourly[hour]={conn:0,unconn:0,ai:0};
+
+      var normStatus=normalizeStatus(status);
+      if(normStatus==='conn'){ totalConn++; dailyMap[dateKey].conn++; hourlyMap[hour].conn++; dailyMap[dateKey].hourly[hour].conn++; }
+      else if(normStatus==='unconn'){ totalUnconn++; dailyMap[dateKey].unconn++; hourlyMap[hour].unconn++; dailyMap[dateKey].hourly[hour].unconn++; }
+      else{ hourlyMap[hour].ai++; dailyMap[dateKey].ai++; dailyMap[dateKey].hourly[hour].ai++; }
+    }
+
+    var totalCalls=totalConn+totalUnconn;
+    var totalRate=totalCalls>0?totalConn/totalCalls:0;
+    var actualDays=uniqueDates.size;
+
+    var sortedDates=Array.from(uniqueDates).sort();
+
+    // Hour table
+    var hourRows=[];
+    for(var h=0;h<24;h++){
+      var s=hourlyMap[h];
+      var calls=s.conn+s.unconn;
+      hourRows.push({hour:h,conn:s.conn,unconn:s.unconn,ai:s.ai,calls:calls,avgCalls:actualDays>0?calls/actualDays:0,rate:calls>0?s.conn/calls:0});
+    }
+
+    // Day table
+    var dayRows=[];
+    sortedDates.forEach(function(d){
+      var s=dailyMap[d];
+      var calls=s.conn+s.unconn;
+      dayRows.push({date:d,conn:s.conn,unconn:s.unconn,ai:s.ai,calls:calls,rate:calls>0?s.conn/calls:0});
+    });
+
+    // Daily detail
+    var dailyDetailArr=[];
+    sortedDates.forEach(function(d){
+      var s=dailyMap[d];
+      var detailRows=[];
+      for(var h=0;h<24;h++){
+        var hd=s.hourly[h]||{conn:0,unconn:0,ai:0};
+        var calls=hd.conn+hd.unconn;
+        detailRows.push({hour:h,conn:hd.conn,unconn:hd.unconn,ai:hd.ai,calls:calls,rate:calls>0?hd.conn/calls:0});
+      }
+      dailyDetailArr.push({date:d,rows:detailRows});
+    });
+
+    analysisData={totalCalls,totalConn,totalUnconn,totalRate,actualDays,sortedDates,hourRows,dayRows,dailyDetailArr};
+
+    renderResults();
+    document.getElementById('btnDownload').classList.remove('hidden');
+    document.getElementById('results').classList.remove('hidden');
+  }catch(e){
+    console.error(e);
+    document.getElementById('errorMsg').textContent=e.message; document.getElementById('errorMsg').style.display='block';
+  }finally{
+    btn.disabled=false; btn.textContent='🔍 开始分析';
+  }
+}
+
+function normalizeStatus(s){
+  s=s.trim();
+  if(s==='是'||s==='接通') return 'conn';
+  if(s==='否'||s==='未接通') return 'unconn';
+  return 'ai';
+}
+
+function parseCallTime(s){
+  try{
+    if(/^\d{5}$/.test(s)){ var d=new Date(1900,0,Number(s)-1,0,0,0); if(!isNaN(d)) return d; }
+    var d=new Date(s); if(!isNaN(d)) return d;
+    var m=s.match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
+    if(m) return new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3]));
+    return null;
+  }catch(e){ return null; }
+}
+
+function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+function renderResults(){
+  var stats=analysisData;
+  document.getElementById('metrics').innerHTML=
+    '<div class="metric"><div class="metric-value">'+stats.totalCalls+' 通</div><div class="metric-label">总通话数量</div></div>'+
+    '<div class="metric"><div class="metric-value">'+stats.actualDays+' 天</div><div class="metric-label">统计天数</div></div>'+
+    '<div class="metric"><div class="metric-value">'+(stats.totalRate*100).toFixed(1)+'%</div><div class="metric-label">总接通率</div></div>';
+
+  // Hour chart
+  var ctxH=document.getElementById('chartHour').getContext('2d');
+  new Chart(ctxH,{type:'bar',data:{labels:stats.hourRows.map(function(r){return r.hour+'时'}),datasets:[
+    {label:'日均电话量',data:stats.hourRows.map(function(r){return +r.avgCalls.toFixed(1)}),backgroundColor:'#1a73e8',yAxisID:'y'},
+    {label:'接通率',data:stats.hourRows.map(function(r){return +(r.rate*100).toFixed(1)}),type:'line',borderColor:'#34a853',tension:0.3,yAxisID:'y1'}
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{position:'left',title:{display:true,text:'日均电话量'}},y1:{position:'right',title:{display:true,text:'接通率%'},grid:{display:false}}}}});
+
+  // Day chart
+  var ctxD=document.getElementById('chartDay').getContext('2d');
+  new Chart(ctxD,{type:'bar',data:{labels:stats.dayRows.map(function(r){return r.date}),datasets:[
+    {label:'有效电话量',data:stats.dayRows.map(function(r){return r.calls}),backgroundColor:'#1a73e8',yAxisID:'y'},
+    {label:'接通率',data:stats.dayRows.map(function(r){return +(r.rate*100).toFixed(1)}),type:'line',borderColor:'#34a853',tension:0.3,yAxisID:'y1'}
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{position:'left',title:{display:true,text:'电话量'}},y1:{position:'right',title:{display:true,text:'接通率%'},grid:{display:false}}}}});
+
+  // Hour table
+  var thHtml='<table><thead><tr><th>时段</th><th>人工接通</th><th>人工未接通</th><th>AI接线</th><th>电话量</th><th>日均电话量</th><th>接通率</th></tr></thead><tbody>';
+  var hTotal={conn:0,unconn:0,ai:0,calls:0};
+  stats.hourRows.forEach(function(r){
+    thHtml+='<tr><td>'+r.hour+'时</td><td>'+r.conn+'</td><td>'+r.unconn+'</td><td>'+r.ai+'</td><td>'+r.calls+'</td><td>'+r.avgCalls.toFixed(1)+'</td><td>'+(r.rate*100).toFixed(2)+'%</td></tr>';
+    hTotal.conn+=r.conn; hTotal.unconn+=r.unconn; hTotal.ai+=r.ai; hTotal.calls+=r.calls;
+  });
+  var hRate=hTotal.calls>0?hTotal.conn/hTotal.calls:0;
+  thHtml+='<tr style="font-weight:700;background:#f0f4ff"><td>总计</td><td>'+hTotal.conn+'</td><td>'+hTotal.unconn+'</td><td>'+hTotal.ai+'</td><td>'+hTotal.calls+'</td><td>'+(hTotal.calls/stats.actualDays).toFixed(1)+'</td><td>'+(hRate*100).toFixed(2)+'%</td></tr>';
+  thHtml+='</tbody></table>';
+  document.getElementById('tableHourWrap').innerHTML=thHtml;
+
+  // Day table
+  var tdHtml='<table><thead><tr><th>日期</th><th>人工接通</th><th>人工未接通</th><th>AI接线</th><th>电话量</th><th>接通率</th></tr></thead><tbody>';
+  var dTotal={conn:0,unconn:0,ai:0,calls:0};
+  stats.dayRows.forEach(function(r){
+    tdHtml+='<tr><td>'+r.date+'</td><td>'+r.conn+'</td><td>'+r.unconn+'</td><td>'+r.ai+'</td><td>'+r.calls+'</td><td>'+(r.rate*100).toFixed(2)+'%</td></tr>';
+    dTotal.conn+=r.conn; dTotal.unconn+=r.unconn; dTotal.ai+=r.ai; dTotal.calls+=r.calls;
+  });
+  var dRate=dTotal.calls>0?dTotal.conn/dTotal.calls:0;
+  tdHtml+='<tr style="font-weight:700;background:#f0f4ff"><td>总计</td><td>'+dTotal.conn+'</td><td>'+dTotal.unconn+'</td><td>'+dTotal.ai+'</td><td>'+dTotal.calls+'</td><td>'+(dRate*100).toFixed(2)+'%</td></tr>';
+  tdHtml+='</tbody></table>';
+  document.getElementById('tableDayWrap').innerHTML=tdHtml;
+
+  // Daily detail
+  var ddHtml='';
+  stats.dailyDetailArr.forEach(function(dd){
+    ddHtml+='<details style="margin-bottom:10px;"><summary style="cursor:pointer;font-weight:600;padding:8px;background:#f8f9ff;border-radius:6px;">📊 '+dd.date+' 详细趋势</summary>';
+    ddHtml+='<div style="max-height:300px;overflow:auto;margin-top:8px;"><table><thead><tr><th>时段</th><th>人工接通</th><th>人工未接通</th><th>AI接线</th><th>电话量</th><th>接通率</th></tr></thead><tbody>';
+    dd.rows.forEach(function(r){
+      ddHtml+='<tr><td>'+r.hour+'时</td><td>'+r.conn+'</td><td>'+r.unconn+'</td><td>'+r.ai+'</td><td>'+r.calls+'</td><td>'+(r.rate*100).toFixed(2)+'%</td></tr>';
+    });
+    ddHtml+='</tbody></table></div></details>';
+  });
+  document.getElementById('dailyDetail').innerHTML=ddHtml;
+}
+
+async function downloadReport(){
+  if(!analysisData) return;
+  var stats=analysisData;
+  var wb=new ExcelJS.Workbook();
+  var ws=wb.addWorksheet('汇总与分析');
+  ws.getColumn(1).width=12; ws.getColumn(2).width=12; ws.getColumn(3).width=14; ws.getColumn(4).width=12; ws.getColumn(5).width=14; ws.getColumn(6).width=14; ws.getColumn(7).width=12;
+
+  var headerFont={name:'微软雅黑',size:10,bold:true};
+  var bodyFont={name:'微软雅黑',size:10};
+  var alignC={horizontal:'center',vertical:'middle'};
+
+  var metricsData=[['总通话数量',stats.totalCalls+' 通'],['统计天数',stats.actualDays+' 天'],['总接通率',(stats.totalRate*100).toFixed(1)+'%']];
+  metricsData.forEach(function(m,i){ ws.getRow(i+1).getCell(1).value=m[0]; ws.getRow(i+1).getCell(2).value=m[1]; });
+
+  ws.getRow(5).getCell(1).value='时段'; ws.getRow(5).getCell(2).value='人工接通'; ws.getRow(5).getCell(3).value='人工未接通'; ws.getRow(5).getCell(4).value='AI接线'; ws.getRow(5).getCell(5).value='电话量'; ws.getRow(5).getCell(6).value='日均电话量'; ws.getRow(5).getCell(7).value='接通率';
+  [1,2,3,4,5,6,7].forEach(function(c){ ws.getRow(5).getCell(c).font=headerFont; ws.getRow(5).getCell(c).alignment=alignC; });
+
+  stats.hourRows.forEach(function(r,i){ var row=ws.getRow(6+i); row.getCell(1).value=r.hour+'时'; row.getCell(2).value=r.conn; row.getCell(3).value=r.unconn; row.getCell(4).value=r.ai; row.getCell(5).value=r.calls; row.getCell(6).value=+r.avgCalls.toFixed(1); row.getCell(7).value=+(r.rate*100).toFixed(2)+'%'; });
+
+  var ds=wb.addWorksheet('每日概览');
+  ds.getRow(1).getCell(1).value='日期'; ds.getRow(1).getCell(2).value='人工接通'; ds.getRow(1).getCell(3).value='人工未接通'; ds.getRow(1).getCell(4).value='AI接线'; ds.getRow(1).getCell(5).value='电话量'; ds.getRow(1).getCell(6).value='接通率';
+  [1,2,3,4,5,6].forEach(function(c){ ds.getRow(1).getCell(c).font=headerFont; ds.getRow(1).getCell(c).alignment=alignC; });
+  stats.dayRows.forEach(function(r,i){ var row=ds.getRow(2+i); row.getCell(1).value=r.date; row.getCell(2).value=r.conn; row.getCell(3).value=r.unconn; row.getCell(4).value=r.ai; row.getCell(5).value=r.calls; row.getCell(6).value=+(r.rate*100).toFixed(2)+'%'; });
+
+  var buf=await wb.xlsx.writeBuffer();
+  var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download='全量分析报告.xlsx';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>

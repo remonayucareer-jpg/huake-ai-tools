@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>酒店网评智能分析系统</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#2c3e50 100%);min-height:100vh;color:#fff}
+.container{max-width:960px;margin:0 auto;padding:30px 20px}
+.header{text-align:center;padding:20px 0 30px}
+.header .logo{font-size:48px;margin-bottom:10px}
+.header h1{font-size:28px;letter-spacing:2px}
+.header .sub{font-size:13px;opacity:.6;margin-top:5px}
+
+/* 上传区域 */
+.upload-box{background:rgba(255,255,255,.08);border:2px dashed rgba(255,255,255,.25);border-radius:16px;padding:40px 30px;cursor:pointer;transition:all .3s;text-align:center;margin-bottom:20px}
+.upload-box:hover{border-color:#c0392b;background:rgba(255,255,255,.12)}
+.upload-box.dragover{border-color:#c0392b;background:rgba(255,255,255,.12)}
+.upload-icon{font-size:40px;margin-bottom:10px}
+.upload-box h3{font-size:16px;margin-bottom:5px}
+.upload-box p{font-size:12px;opacity:.6}
+.upload-box input[type="file"]{display:none}
+
+/* 状态 */
+.status{display:none;padding:12px 18px;border-radius:10px;margin:10px 0;font-size:13px;text-align:center}
+.status.loading{display:block;background:rgba(255,255,255,.1)}
+.status.error{display:block;background:rgba(192,57,43,.3);border:1px solid rgba(192,57,43,.5)}
+.status.success{display:block;background:rgba(39,174,96,.3);border:1px solid rgba(39,174,96,.5)}
+.spinner{display:inline-block;width:18px;height:18px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 报告区域 */
+.report{display:none;margin-top:20px}
+.report-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;flex-wrap:wrap;gap:10px}
+.report-header h2{font-size:20px}
+.download-btn{background:#c0392b;color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:14px;transition:background .3s;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.download-btn:hover{background:#e74c3c}
+
+/* 报告卡片 */
+.section{margin-bottom:20px}
+.section-title{font-size:18px;font-weight:bold;padding:10px 0;border-bottom:2px solid #c0392b;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-title .num{background:#c0392b;color:#fff;border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.section-desc{font-size:13px;opacity:.8;margin-bottom:10px;line-height:1.6}
+
+/* 概览卡片 */
+.overview-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 15px}
+.overview-card{background:rgba(255,255,255,.08);border-radius:10px;padding:12px;text-align:center}
+.overview-card .val{font-size:22px;font-weight:bold;color:#c0392b}
+.overview-card .lbl{font-size:11px;opacity:.6;margin-top:3px}
+
+/* 表格 */
+.table-wrap{overflow-x:auto;margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#2c3e50;color:#fff;padding:8px 6px;text-align:center;font-weight:bold;white-space:nowrap}
+td{padding:6px;border-bottom:1px solid rgba(255,255,255,.1);vertical-align:top;line-height:1.5}
+tr:nth-child(even) td{background:rgba(255,255,255,.03)}
+tr:hover td{background:rgba(255,255,255,.06)}
+.tag-name{font-weight:bold;color:#f39c12}
+.tag-name.good{color:#2ecc71}
+.star{color:#f1c40f;font-size:11px}
+.quote{color:rgba(255,255,255,.7);font-size:11px;line-height:1.5}
+
+/* AI场景 */
+.scenario-card{background:rgba(255,255,255,.05);border-radius:10px;padding:14px;margin-bottom:10px}
+.scenario-card h4{font-size:14px;color:#e74c3c;margin-bottom:6px}
+.scenario-card .label{font-size:11px;opacity:.6;margin-top:6px;margin-bottom:2px}
+.scenario-card .text{font-size:12px;color:rgba(255,255,255,.8);line-height:1.6;padding-left:10px}
+.scenario-card .sug{color:#e74c3c;font-size:12px;line-height:1.6;padding-left:10px}
+
+/* 比例估算 */
+.coverage-summary{background:rgba(39,174,96,.1);border:1px solid rgba(39,174,96,.3);border-radius:10px;padding:14px;text-align:center;margin-bottom:12px}
+.coverage-summary .big{font-size:28px;font-weight:bold;color:#2ecc71}
+.coverage-summary .desc{font-size:13px;opacity:.8;margin-top:4px}
+
+/* 进度条 */
+.progress-bar{background:rgba(255,255,255,.1);border-radius:6px;height:8px;overflow:hidden;margin:4px 0}
+.progress-fill{height:100%;border-radius:6px;transition:width .5s}
+.progress-fill.green{background:linear-gradient(90deg,#27ae60,#2ecc71)}
+.progress-fill.orange{background:linear-gradient(90deg,#e67e22,#f39c12)}
+.progress-fill.blue{background:linear-gradient(90deg,#2980b9,#3498db)}
+.progress-fill.red{background:linear-gradient(90deg,#c0392b,#e74c3c)}
+
+.footer{text-align:center;font-size:11px;opacity:.4;margin-top:30px;padding:20px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="logo">🏨</div>
+    <h1>酒店网评智能分析系统</h1>
+    <p class="sub">上传携程评论文档 → 自动分析 → 在线预览 + PDF下载</p>
+  </div>
+  
+  <div class="upload-box" id="uploadBox">
+    <div class="upload-icon">📄</div>
+    <h3>点击上传或拖拽文件</h3>
+    <p>支持 .docx 格式（如：武汉新世界酒店 好评差评收集.docx）</p>
+    <input type="file" id="fileInput" accept=".docx">
+  </div>
+  
+  <div class="status" id="statusMsg"></div>
+  
+  <div class="report" id="reportArea"></div>
+  
+  <div class="footer">基于AI自然语言处理技术 · 专业酒店网评深度洞察</div>
+</div>
+
+<script>
+const box = document.getElementById('uploadBox');
+const input = document.getElementById('fileInput');
+const status = document.getElementById('statusMsg');
+const report = document.getElementById('reportArea');
+
+box.addEventListener('click', () => input.click());
+box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('dragover'); });
+box.addEventListener('dragleave', () => box.classList.remove('dragover'));
+box.addEventListener('drop', e => {
+  e.preventDefault();
+  box.classList.remove('dragover');
+  if (e.dataTransfer.files.length) input.files = e.dataTransfer.files;
+});
+input.addEventListener('change', handleFile);
+
+function starStr(count, total) {
+  const r = count / total;
+  if (r >= 0.5) return '★★★★★';
+  if (r >= 0.3) return '★★★★';
+  if (r >= 0.15) return '★★★';
+  if (r >= 0.08) return '★★';
+  return '★';
+}
+
+async function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  status.className = 'status loading';
+  status.innerHTML = '<span class="spinner"></span> 正在解析评论数据...';
+  report.style.display = 'none';
+  
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // 第一步：获取分析数据
+    const resp = await fetch('/analyze', { method: 'POST', body: formData });
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error || '服务器错误');
+    }
+    const data = await resp.json();
+    
+    status.className = 'status success';
+    status.innerHTML = `✅ 分析完成！共 ${data.total} 条评论（好评 ${data.goodCount} 条，差评 ${data.badCount} 条）`;
+    
+    // 第二步：渲染报告
+    renderReport(data);
+    
+  } catch (err) {
+    console.error(err);
+    status.className = 'status error';
+    status.innerHTML = '❌ ' + err.message;
+  }
+}
+
+function renderReport(d) {
+  const goodRate = Math.round(d.goodCount / Math.max(d.total, 1) * 100);
+  const badRate = Math.round(d.badCount / Math.max(d.total, 1) * 100);
+  const aiCoverRate = Math.round(d.aiCoverage.coverable / Math.max(d.aiCoverage.total, 1) * 100);
+  
+  let html = `
+  <div class="report-header">
+    <h2>📊 ${d.hotelName} · 差评深度洞察报告</h2>
+    <button class="download-btn" onclick="downloadPDF()">📥 下载PDF报告</button>
+  </div>
+  
+  <!-- 一、整体评价概览 -->
+  <div class="section">
+    <div class="section-title"><span class="num">1</span> 整体评价概览</div>
+    <p class="section-desc">本次分析共采集酒店有效评论 <strong>${d.total}</strong> 条，其中好评（评分≥4.0分）<strong>${d.goodCount}</strong> 条，差评（评分≤3.0分）<strong>${d.badCount}</strong> 条，好评率约 <strong>${goodRate}%</strong>。</p>
+    <div class="overview-cards">
+      <div class="overview-card"><div class="val">${d.total}</div><div class="lbl">评论总数</div></div>
+      <div class="overview-card"><div class="val">${d.goodCount}</div><div class="lbl">好评</div></div>
+      <div class="overview-card"><div class="val">${d.badCount}</div><div class="lbl">差评</div></div>
+      <div class="overview-card"><div class="val">${goodRate}%</div><div class="lbl">好评率</div></div>
+    </div>
+    <p class="section-desc">差评覆盖的核心领域集中在 <strong>${d.badTags.slice(0,5).map(t => t.name).join('、')}</strong> 等板块。其中"<strong>${d.badTags[0].name}</strong>"几乎贯穿所有差评，成为最核心的负面标签。</p>
+  </div>
+  
+  <!-- 二、好评核心标签 -->
+  <div class="section">
+    <div class="section-title"><span class="num">2</span> 好评核心标签提炼（高频项）</div>
+    <p class="section-desc">基于 ${d.goodCount} 条好评原文，提炼出以下 ${d.goodTags.length} 个高频好评标签：</p>
+    <div class="table-wrap">
+      <table>
+        <tr><th style="width:40px">序号</th><th style="width:140px">核心好评标签</th><th style="width:80px">提及频次</th><th>客人原话</th></tr>
+        ${d.goodTags.map((t, i) => `
+        <tr>
+          <td style="text-align:center">${i+1}</td>
+          <td><span class="tag-name good">${t.name}</span></td>
+          <td style="text-align:center"><span class="star">${t.star}</span><br>${t.count}次</td>
+          <td><span class="quote">${t.quotes.slice(0,2).join('；') || '—'}</span></td>
+        </tr>`).join('')}
+      </table>
+    </div>
+  </div>
+  
+  <!-- 三、差评核心问题标签 -->
+  <div class="section">
+    <div class="section-title"><span class="num">3</span> 差评核心问题标签提炼（高频项）</div>
+    <p class="section-desc">基于 ${d.badCount} 条差评原文，提炼出以下 ${d.badTags.length} 个高频核心痛点标签：</p>
+    <div class="table-wrap">
+      <table>
+        <tr><th style="width:40px">序号</th><th style="width:140px">核心痛点标签</th><th style="width:80px">提及频次</th><th>客人原话</th></tr>
+        ${d.badTags.map((t, i) => `
+        <tr>
+          <td style="text-align:center">${i+1}</td>
+          <td><span class="tag-name">${t.name}</span></td>
+          <td style="text-align:center"><span class="star">${t.star}</span><br>${t.count}次</td>
+          <td><span class="quote">${t.quotes.slice(0,2).join('；') || '—'}</span></td>
+        </tr>`).join('')}
+      </table>
+    </div>
+  </div>
+  
+  <!-- 四、AI可解决方向分析 -->
+  <div class="section">
+    <div class="section-title"><span class="num">4</span> AI可解决方向分析</div>
+    <p class="section-desc">以下分析聚焦于差评中可通过AI语音交互软件（如智能客服、语音导航、信息查询等）进行优化或解决的问题场景。通过AI前置拦截和主动引导，可有效降低客人因信息不对称或服务响应不及时而产生的不满。</p>
+    ${d.aiScenarios.map(s => `
+    <div class="scenario-card">
+      <h4>🔧 ${s.s}</h4>
+      <div class="label">📌 差评原文问题描述：</div>
+      <div class="text">${s.q.map(q => q).join('<br>')}</div>
+      <div class="label">💡 AI可解决方向：</div>
+      <div class="text">${s.sol.split('\\n').join('<br>')}</div>
+      <div class="label">🤖 AI话术/功能建议：</div>
+      <div class="sug">${s.sug}</div>
+    </div>`).join('')}
+  </div>
+  
+  <!-- 五、AI可覆盖的差评比例估算 -->
+  <div class="section">
+    <div class="section-title"><span class="num">5</span> AI可覆盖的差评比例估算</div>
+    <div class="coverage-summary">
+      <div class="big">${aiCoverRate}%</div>
+      <div class="desc">经分析，${d.aiCoverage.total}条差评中，约<strong>${d.aiCoverage.coverable}</strong>条（占比约${aiCoverRate}%）涉及的问题可通过AI语音软件在不同程度上进行缓解或前置解决</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <tr><th>AI解决类型</th><th style="width:80px">涉及差评数</th><th style="width:60px">占比</th><th>典型场景</th></tr>
+        ${d.aiCoverage.types.map((t, i) => {
+          const scenes = {'信息查询与指引类':'外卖取餐位置、周边景点/交通指引、设施使用方法','费用说明与核对类':'迷你吧收费告知、押金规则说明、退房消费核对','房卡/门禁指引类':'房卡有效期提醒、续期方式指引、电子房卡方案','设施状态查询类':'泳池/健身房实时占用查询、包场时段告知'};
+          const colors = ['green','orange','blue','red'];
+          return `
+        <tr>
+          <td>${t.name}</td>
+          <td style="text-align:center">${t.count}条</td>
+          <td style="text-align:center">${t.percent}%</td>
+          <td>${scenes[t.name] || '—'}</td>
+        </tr>`;
+        }).join('')}
+      </table>
+    </div>
+  </div>`;
+  
+  report.innerHTML = html;
+  report.style.display = 'block';
+  
+  // 保存数据供下载使用
+  window._reportData = d;
+}
+
+async function downloadPDF() {
+  const d = window._reportData;
+  if (!d) return;
+  
+  status.className = 'status loading';
+  status.innerHTML = '<span class="spinner"></span> 正在生成PDF报告...';
+  
+  try {
+    // 重新上传文件获取PDF
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const resp = await fetch('/upload', { method: 'POST', body: formData });
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error || '服务器错误');
+    }
+    
+    const disp = resp.headers.get('Content-Disposition');
+    let filename = '酒店差评深度洞察报告.pdf';
+    if (disp) {
+      const m = disp.match(/filename="?(.+?)"?$/);
+      if (m) filename = decodeURIComponent(m[1]);
+    }
+    
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    status.className = 'status success';
+    status.innerHTML = '✅ PDF报告已生成并下载！';
+  } catch (err) {
+    console.error(err);
+    status.className = 'status error';
+    status.innerHTML = '❌ ' + err.message;
+  }
+}
+</script>
+</body>
+</html>

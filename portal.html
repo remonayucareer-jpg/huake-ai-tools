@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>华客AI运营工具平台</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f2f5; height: 100vh; overflow: hidden; }
+
+/* Login Page */
+.login-page { display: flex; align-items: center; justify-content: center; height: 100vh; background: linear-gradient(135deg, #5c7a99 0%, #2d3e50 100%); }
+.login-box { background: #fff; border-radius: 16px; padding: 48px 40px; width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center; }
+.login-box h1 { font-size: 22px; color: #1a1a1a; margin-bottom: 8px; }
+.login-box p { font-size: 13px; color: #888; margin-bottom: 32px; }
+.login-box input { width: 100%; padding: 14px 16px; border: 2px solid #e0e4e8; border-radius: 10px; font-size: 15px; outline: none; transition: border 0.2s; }
+.login-box input:focus { border-color: #1a73e8; }
+.login-box .btn-login { width: 100%; margin-top: 20px; padding: 14px; background: #1a73e8; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.login-box .btn-login:hover { background: #1557b0; }
+.login-error { color: #d93025; font-size: 13px; margin-top: 12px; display: none; }
+
+/* Main Layout */
+.main-page { display: none; height: 100vh; }
+.sidebar { position: fixed; top: 0; left: 0; width: 260px; height: 100vh; background: #1e293b; color: #cbd5e1; overflow-y: auto; z-index: 10; transition: width 0.3s; }
+.sidebar.collapsed { width: 0; overflow: hidden; }
+.sidebar-header { padding: 20px; background: #0f172a; display: flex; align-items: center; gap: 10px; }
+.sidebar-header .logo { font-size: 18px; font-weight: 700; color: #fff; white-space: nowrap; }
+.sidebar-toggle { position: fixed; top: 12px; left: 268px; z-index: 11; width: 36px; height: 36px; background: #1e293b; color: #fff; border: none; border-radius: 0 8px 8px 0; cursor: pointer; font-size: 18px; transition: left 0.3s; display: flex; align-items: center; justify-content: center; }
+.sidebar-toggle.shifted { left: 8px; }
+.stage-group { margin-top: 4px; }
+.stage-header { padding: 14px 20px; font-size: 14px; font-weight: 600; color: #94a3b8; cursor: pointer; display: flex; align-items: center; gap: 8px; user-select: none; transition: background 0.15s; }
+.stage-header:hover { background: #334155; }
+.stage-header .arrow { transition: transform 0.2s; font-size: 10px; }
+.stage-header.open .arrow { transform: rotate(90deg); }
+.tool-list { display: none; }
+.tool-list.open { display: block; }
+.tool-item { padding: 10px 20px 10px 40px; font-size: 13px; color: #cbd5e1; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.tool-item:hover { background: #334155; color: #fff; }
+.tool-item.active { background: #1a73e8; color: #fff; font-weight: 600; }
+.content-area { margin-left: 260px; height: 100vh; background: #fff; transition: margin-left 0.3s; }
+.content-area.expanded { margin-left: 0; }
+.content-area iframe { width: 100%; height: 100vh; border: none; }
+</style>
+</head>
+<body>
+
+<!-- Login Page -->
+<div class="login-page" id="loginPage">
+  <div class="login-box">
+    <h1>🏨 华客AI运营工具平台</h1>
+    <p>请输入密码以访问工具集</p>
+    <input type="password" id="passwordInput" placeholder="请输入访问密码" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn-login" onclick="doLogin()">登 录</button>
+    <div class="login-error" id="loginError">密码错误，请重试</div>
+  </div>
+</div>
+
+<!-- Main Page -->
+<div class="main-page" id="mainPage">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span style="font-size:22px;">🏨</span>
+      <span class="logo">华客AI工具平台</span>
+    </div>
+
+    <div class="stage-group">
+      <div class="stage-header" onclick="toggleStage(this)">
+        <span class="arrow">▶</span> 酒店上线前
+        <span style="font-size:10px;color:#64748b;margin-left:auto;">产品/酒店调研</span>
+      </div>
+      <div class="tool-list">
+        <div class="tool-item" onclick="loadTool(this, 'tool_review_analyzer.html')">📝 酒店网评智能分析</div>
+      </div>
+    </div>
+
+    <div class="stage-group">
+      <div class="stage-header open" onclick="toggleStage(this)">
+        <span class="arrow">▶</span> 酒店上线中
+      </div>
+      <div class="tool-list open">
+        <div class="tool-item active" onclick="loadTool(this, 'tool_evaluation.html')">📊 上线评估工具</div>
+      </div>
+    </div>
+
+    <div class="stage-group">
+      <div class="stage-header" onclick="toggleStage(this)">
+        <span class="arrow">▶</span> 酒店上线后
+        <span style="font-size:10px;color:#64748b;margin-left:auto;">反馈/测试报告</span>
+      </div>
+      <div class="tool-list">
+        <div class="tool-item" onclick="loadTool(this, 'tool_call_analysis.html')">📞 上线前 - 人工接通率分析</div>
+        <div class="tool-item" onclick="loadTool(this, 'tool_weekly_report.html')">📈 运营周报（数据）</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">☰</button>
+
+  <div class="content-area" id="contentArea">
+    <iframe id="toolFrame" src="tool_evaluation.html"></iframe>
+  </div>
+</div>
+
+<script>
+var PASSWORD = "Huake2026";
+
+function doLogin() {
+  var input = document.getElementById("passwordInput");
+  var err = document.getElementById("loginError");
+  if (input.value === PASSWORD) {
+    document.getElementById("loginPage").style.display = "none";
+    document.getElementById("mainPage").style.display = "block";
+  } else {
+    err.style.display = "block";
+    input.value = "";
+  }
+}
+
+function toggleStage(header) {
+  header.classList.toggle("open");
+  header.nextElementSibling.classList.toggle("open");
+}
+
+function toggleSidebar() {
+  var sb = document.getElementById("sidebar");
+  var ca = document.getElementById("contentArea");
+  var btn = document.getElementById("sidebarToggle");
+  sb.classList.toggle("collapsed");
+  ca.classList.toggle("expanded");
+  btn.classList.toggle("shifted");
+}
+
+function loadTool(item, url) {
+  document.querySelectorAll(".tool-item").forEach(function(el) { el.classList.remove("active"); });
+  item.classList.add("active");
+  document.getElementById("toolFrame").src = url;
+}
+</script>
+</body>
+</html>
