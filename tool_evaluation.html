@@ -782,4 +782,437 @@ async function downloadReport() {
 }
 </script>
 </body>
+
+// ============ 解析批量测试报告 ============
+function parseBatchForEval(wb) {
+  var rows = [];
+  var sheetNames = wb.SheetNames;
+  var targetSheet = null;
+  for (var i = 0; i < sheetNames.length; i++) {
+    var sn = sheetNames[i];
+    if (sn.indexOf("内测结果明细表") >= 0 || sn.indexOf("明细") >= 0) {
+      targetSheet = wb.Sheets[sn];
+      break;
+    }
+  }
+  if (!targetSheet) targetSheet = wb.Sheets[sheetNames[0]];
+  if (!targetSheet) return rows;
+  var data = XLSX.utils.sheet_to_json(targetSheet, { header: 1, defval: "" });
+  var headers = data[0] || [];
+  var colMap = {};
+  headers.forEach(function(h, i) { colMap[String(h).trim()] = i; });
+  var typeCol = colMap["测试类型"] !== undefined ? colMap["测试类型"] : -1;
+  var sentenceCol = colMap["测试句"] !== undefined ? colMap["测试句"] : -1;
+  var expectCol = colMap["期望回复"] !== undefined ? colMap["期望回复"] : -1;
+  var actualCol = colMap["实际回复"] !== undefined ? colMap["实际回复"] : -1;
+  var correctCol = colMap["回复是否正确"] !== undefined ? colMap["回复是否正确"] : -1;
+  var sessionCol = colMap["会话ID/工单ID"] !== undefined ? colMap["会话ID/工单ID"] : -1;
+  if (typeCol < 0 || correctCol < 0) return rows;
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (!row || row.length === 0) continue;
+    var testType = String(row[typeCol] || "").trim();
+    if (!testType) continue;
+    var isCorrect = String(row[correctCol] || "").trim();
+    var normalizedSuccess = (isCorrect === "是" || isCorrect === "正确" || isCorrect === "true" || isCorrect === "1") ? "是" : "否";
+    rows.push({
+      testType: testType,
+      testSentence: sentenceCol >= 0 ? String(row[sentenceCol] || "") : "",
+      expectReply: expectCol >= 0 ? String(row[expectCol] || "") : "",
+      actualReply: actualCol >= 0 ? String(row[actualCol] || "") : "",
+      isCorrect: normalizedSuccess,
+      sessionId: sessionCol >= 0 ? String(row[sessionCol] || "") : ""
+    });
+  }
+  return rows;
+}
+
+// ============ 解析运营测试记录 ============
+function parseOpForEval(wb) {
+  var rows = [];
+  var sheetNames = wb.SheetNames;
+  var targetSheet = null;
+  for (var i = 0; i < sheetNames.length; i++) {
+    var sn = sheetNames[i];
+    if (sn.indexOf("测试记录") >= 0 || sn.indexOf("运营") >= 0 || sn.indexOf("Sheet1") >= 0) {
+      targetSheet = wb.Sheets[sn];
+      break;
+    }
+  }
+  if (!targetSheet) targetSheet = wb.Sheets[sheetNames[0]];
+  if (!targetSheet) return rows;
+  var data = XLSX.utils.sheet_to_json(targetSheet, { header: 1, defval: "" });
+  var headers = data[0] || [];
+  var colMap = {};
+  headers.forEach(function(h, i) { colMap[String(h).trim()] = i; });
+  var typeCol = colMap["测试类型"] !== undefined ? colMap["测试类型"] : -1;
+  var sentenceCol = colMap["测试句"] !== undefined ? colMap["测试句"] : -1;
+  var expectCol = colMap["期望回复"] !== undefined ? colMap["期望回复"] : -1;
+  var actualCol = colMap["实际回复"] !== undefined ? colMap["实际回复"] : -1;
+  var correctCol = colMap["回复是否正确"] !== undefined ? colMap["回复是否正确"] : -1;
+  var sessionCol = colMap["会话ID/工单ID"] !== undefined ? colMap["会话ID/工单ID"] : -1;
+  if (typeCol < 0 || correctCol < 0) return rows;
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (!row || row.length === 0) continue;
+    var testType = String(row[typeCol] || "").trim();
+    if (!testType) continue;
+    var isCorrect = String(row[correctCol] || "").trim();
+    var normalizedSuccess = (isCorrect === "是" || isCorrect === "正确" || isCorrect === "true" || isCorrect === "1") ? "是" : "否";
+    rows.push({
+      testType: testType,
+      testSentence: sentenceCol >= 0 ? String(row[sentenceCol] || "") : "",
+      expectReply: expectCol >= 0 ? String(row[expectCol] || "") : "",
+      actualReply: actualCol >= 0 ? String(row[actualCol] || "") : "",
+      isCorrect: normalizedSuccess,
+      sessionId: sessionCol >= 0 ? String(row[sessionCol] || "") : ""
+    });
+  }
+  return rows;
+}
+
+// ============ 计算统计 ============
+function computeStats(rows) {
+  var typeStats = {};
+  var typeOrder = ["批量测试", "咨询类", "工单类（华客）", "工单类（第三方）", "工单类（送物机器人）", "转接类（首句转人工）", "转接类（转指定部门）", "未识别转人工兜底"];
+  rows.forEach(function(row) {
+    var t = row.testType;
+    if (!typeStats[t]) typeStats[t] = { total: 0, failed: 0 };
+    typeStats[t].total++;
+    if (row.isCorrect === "否") typeStats[t].failed++;
+  });
+  var merged = {};
+  var mergeMap = {
+    "工单类（华客）": ["工单类（华客）", "工单类(华客)"],
+    "工单类（第三方）": ["工单类（第三方）", "工单类(第三方)"],
+    "工单类（送物机器人）": ["工单类（送物机器人）", "工单类(送物机器人)"],
+    "转接类（首句转人工）": ["转接类（首句转人工）", "转接类(首句转人工)"],
+    "转接类（转指定部门）": ["转接类（转指定部门）", "转接类(转指定部门)"]
+  };
+  var processed = {};
+  for (var type in typeStats) {
+    if (processed[type]) continue;
+    var canonical = type;
+    var stat = { total: typeStats[type].total, failed: typeStats[type].failed };
+    for (var c in mergeMap) {
+      if (mergeMap[c].indexOf(type) >= 0) {
+        canonical = c;
+        stat = { total: 0, failed: 0 };
+        mergeMap[c].forEach(function(a) {
+          if (typeStats[a]) { stat.total += typeStats[a].total; stat.failed += typeStats[a].failed; processed[a] = true; }
+        });
+        break;
+      }
+    }
+    if (!processed[type]) processed[type] = true;
+    if (!merged[canonical]) merged[canonical] = stat;
+  }
+  var weights = {
+    "批量测试": 1, "咨询类": 10, "工单类（华客）": 50, "工单类（第三方）": 50,
+    "工单类（送物机器人）": 50, "转接类（首句转人工）": 50, "转接类（转指定部门）": 50, "未识别转人工兜底": 50
+  };
+  var orderedStats = [];
+  var totalCases = 0;
+  var totalWeightedFailures = 0;
+  typeOrder.forEach(function(t) {
+    if (merged[t]) {
+      var s = merged[t];
+      var w = weights[t] || 1;
+      var wf = s.failed * w;
+      totalCases += s.total;
+      totalWeightedFailures += wf;
+      orderedStats.push({ type: t, total: s.total, failed: s.failed, weight: w, weightedFail: wf });
+    }
+  });
+  for (var t in merged) {
+    if (typeOrder.indexOf(t) < 0) {
+      var s = merged[t];
+      var w = weights[t] || 1;
+      var wf = s.failed * w;
+      totalCases += s.total;
+      totalWeightedFailures += wf;
+      orderedStats.push({ type: t, total: s.total, failed: s.failed, weight: w, weightedFail: wf });
+    }
+  }
+  var successRate = totalCases > 0 ? (1 - totalWeightedFailures / totalCases) : 1;
+  var isPass = successRate >= 0.9;
+  return {
+    typeStats: orderedStats,
+    totalCases: totalCases,
+    totalWeightedFailures: totalWeightedFailures,
+    successRate: successRate,
+    isPass: isPass
+  };
+}
+
+// ============ 生成评估报告 ============
+async function generateEvalReport() {
+  document.getElementById("evalErrorMsg").style.display = "none";
+  document.getElementById("evalSuccessMsg").style.display = "none";
+  if (!batchFileObj || !opFileObj) {
+    document.getElementById("evalErrorMsg").textContent = "请先上传两份报告文件";
+    document.getElementById("evalErrorMsg").style.display = "block";
+    return;
+  }
+  var btn = document.getElementById("btnGenerateEval");
+  btn.disabled = true;
+  btn.textContent = "处理中...";
+  try {
+    var batchBuffer = await readFileAsArrayBuffer(batchFileObj);
+    var batchWb = XLSX.read(batchBuffer, { type: "array" });
+    var batchRows = parseBatchForEval(batchWb);
+    var opBuffer = await readFileAsArrayBuffer(opFileObj);
+    var opWb = XLSX.read(opBuffer, { type: "array" });
+    var opRows = parseOpForEval(opWb);
+    if (batchRows.length === 0 && opRows.length === 0) {
+      throw new Error("两份报告中均未提取到有效数据，请检查文件内容");
+    }
+    var allRows = batchRows.concat(opRows);
+    var stats = computeStats(allRows);
+    evalData = { detailRows: allRows, stats: stats };
+    renderEvalResults(allRows, stats);
+    document.getElementById("btnDownloadEval").classList.remove("hidden");
+    document.getElementById("evalResultSection").classList.remove("hidden");
+    document.getElementById("evalSuccessMsg").innerHTML = "评估报告生成成功！共 " + allRows.length + " 条记录（批测 " + batchRows.length + " 条 + 运营 " + opRows.length + " 条）";
+    document.getElementById("evalSuccessMsg").style.display = "block";
+    document.getElementById("evalResultSection").scrollIntoView({ behavior: "smooth" });
+  } catch (err) {
+    console.error(err);
+    document.getElementById("evalErrorMsg").textContent = "生成失败：" + err.message;
+    document.getElementById("evalErrorMsg").style.display = "block";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "生成评估报告";
+  }
+}
+
+// ============ 渲染评估结果 ============
+function renderEvalResults(rows, stats) {
+  document.getElementById("statGrid").innerHTML =
+    '<div class="stat-card"><div class="stat-value">' + stats.totalCases + '</div><div class="stat-label">测试用例总量</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + stats.totalWeightedFailures + '</div><div class="stat-label">加权测试失败量</div></div>' +
+    '<div class="stat-card"><div class="stat-value ' + (stats.isPass ? 'pass' : 'fail') + '">' + (stats.successRate * 100).toFixed(2) + '%</div><div class="stat-label">加权测试成功率</div></div>' +
+    '<div class="stat-card"><div class="stat-value ' + (stats.isPass ? 'pass' : 'fail') + '" style="font-size:22px;">' + (stats.isPass ? '合格' : '不合格') + '</div><div class="stat-label">评估结果（≥90%为合格）</div></div>';
+  var etbody = document.getElementById("evalTableBody");
+  etbody.innerHTML = "";
+  stats.typeStats.forEach(function(s) {
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      "<td>" + esc(s.type) + "</td>" +
+      '<td style="text-align:center;">' + s.total + "</td>" +
+      '<td style="text-align:center;">' + s.failed + "</td>" +
+      '<td style="text-align:center;">' + s.weight + "</td>" +
+      '<td style="text-align:center;font-weight:600;">' + s.weightedFail + "</td>";
+    etbody.appendChild(tr);
+  });
+}
+
+// ============ 下载评估报告 ============
+async function downloadReport() {
+  if (!evalData) {
+    document.getElementById("evalErrorMsg").textContent = "请先生成评估报告";
+    document.getElementById("evalErrorMsg").style.display = "block";
+    return;
+  }
+  var detailRows = evalData.detailRows;
+  var stats = evalData.stats;
+  var workbook = new ExcelJS.Workbook();
+  workbook.creator = "华科 AI 测试评估报告工具";
+  workbook.created = new Date();
+  var ws1 = workbook.addWorksheet("填写说明");
+  ws1.getColumn(1).width = 16.7265625;
+  ws1.getColumn(2).width = 51.6328125;
+  ws1.getRow(1).height = 13;
+  ws1.getRow(2).height = 13;
+  ws1.getRow(3).height = 56.25;
+  var thinBorder = {
+    top: { style: "thin", color: { argb: "FF000000" } },
+    left: { style: "thin", color: { argb: "FF000000" } },
+    bottom: { style: "thin", color: { argb: "FF000000" } },
+    right: { style: "thin", color: { argb: "FF000000" } }
+  };
+  var headerFont = { name: "等线", size: 10, bold: true };
+  var headerAlign = { horizontal: "center", vertical: "middle" };
+  var normalFont = { name: "等线", size: 10 };
+  var redFont = { name: "等线", size: 10, color: { argb: "FFFF0000" } };
+  var normalFontTheme = { name: "等线", size: 10, color: { theme: 1 } };
+  var r1 = ws1.getRow(1);
+  r1.getCell(1).value = "sheet名称"; r1.getCell(1).font = headerFont; r1.getCell(1).alignment = headerAlign; r1.getCell(1).border = thinBorder;
+  r1.getCell(2).value = "说明"; r1.getCell(2).font = headerFont; r1.getCell(2).alignment = { horizontal: "center", vertical: "middle", wrapText: true }; r1.getCell(2).border = thinBorder;
+  var r2 = ws1.getRow(2);
+  r2.getCell(1).value = "评估标准及结果"; r2.getCell(1).font = normalFontTheme; r2.getCell(1).alignment = { vertical: "middle" }; r2.getCell(1).border = thinBorder;
+  r2.getCell(2).value = "无需填写，自动出结果"; r2.getCell(2).font = redFont; r2.getCell(2).alignment = { vertical: "middle", wrapText: true }; r2.getCell(2).border = thinBorder;
+  var r3 = ws1.getRow(3);
+  r3.getCell(1).value = "内测结果明细表"; r3.getCell(1).font = normalFontTheme; r3.getCell(1).alignment = { vertical: "middle" }; r3.getCell(1).border = thinBorder;
+  r3.getCell(2).value = "将\"华客-AI批量测试报告\"与\"测试记录表\"中的结果整合至表内，确保A列为\"测试类型\"，E列为\"回复是否正确\""; r3.getCell(2).font = normalFont; r3.getCell(2).alignment = { vertical: "middle", wrapText: true }; r3.getCell(2).border = thinBorder;
+  var ws2 = workbook.addWorksheet("内测结果明细表");
+  ws2.getColumn(1).width = 16;
+  ws2.getColumn(2).width = 45;
+  ws2.getColumn(3).width = 45;
+  ws2.getColumn(4).width = 45;
+  ws2.getColumn(5).width = 16;
+  ws2.getColumn(6).width = 42;
+  var headerFillGray = { type: "pattern", pattern: "solid", fgColor: { argb: "FFC0C0C0" } };
+  var headerFontA = { name: "微软雅黑", size: 10, bold: true, color: { argb: "FFFF0000" } };
+  var headerFontBF = { name: "微软雅黑", size: 10, bold: true };
+  var headerAlignCenter = { horizontal: "center", vertical: "middle", wrapText: true };
+  var bodyFontA = { name: "微软雅黑", size: 10 };
+  var bodyFontBF = { name: "Calibri", size: 11 };
+  var bodyAlignA = { vertical: "middle" };
+  var hRow = ws2.getRow(1);
+  hRow.height = 14.5;
+  var headers = ["测试类型", "测试句", "期望回复", "实际回复", "回复是否正确", "会话ID/工单ID"];
+  headers.forEach(function(h, idx) {
+    var cell = hRow.getCell(idx + 1);
+    cell.value = h;
+    cell.fill = headerFillGray;
+    cell.alignment = headerAlignCenter;
+    if (idx === 0) cell.font = headerFontA;
+    else cell.font = headerFontBF;
+  });
+  for (var i = 0; i < detailRows.length; i++) {
+    var row = detailRows[i];
+    var dataRow = ws2.getRow(i + 2);
+    dataRow.height = 14.5;
+    dataRow.getCell(1).value = row.testType; dataRow.getCell(1).font = bodyFontA; dataRow.getCell(1).alignment = bodyAlignA;
+    dataRow.getCell(2).value = row.testSentence; dataRow.getCell(2).font = bodyFontBF;
+    dataRow.getCell(3).value = row.expectReply; dataRow.getCell(3).font = bodyFontBF;
+    dataRow.getCell(4).value = row.actualReply; dataRow.getCell(4).font = bodyFontBF;
+    var cE = dataRow.getCell(5);
+    cE.value = row.isCorrect;
+    cE.font = bodyFontBF;
+    if (row.isCorrect === "否") cE.font = { name: "Calibri", size: 11, color: { argb: "FFFF0000" } };
+    cE.alignment = { horizontal: "center", vertical: "middle" };
+    dataRow.getCell(6).value = row.sessionId; dataRow.getCell(6).font = bodyFontBF;
+  }
+  var ws3 = workbook.addWorksheet("评估标准及结果");
+  ws3.getColumn(1).width = 2.1796875;
+  ws3.getColumn(2).width = 21.54296875;
+  ws3.getColumn(3).width = 15.08984375;
+  ws3.getColumn(4).width = 15.6328125;
+  ws3.getColumn(5).width = 14.453125;
+  ws3.getColumn(6).width = 17.08984375;
+  ws3.getColumn(7).width = 53.08984375;
+  ws3.getColumn(8).width = 13.81640625;
+  var yaHeiFont = { name: "微软雅黑", size: 10 };
+  var yaHeiBold = { name: "微软雅黑", size: 10, bold: true };
+  var yaHeiRed = { name: "微软雅黑", size: 10, color: { argb: "FFFF0000" }, bold: true };
+  var yaHeiRedSmall = { name: "微软雅黑", size: 8, color: { argb: "FFFF0000" } };
+  var yaHeiGreenBold = { name: "微软雅黑", size: 10, color: { argb: "FF008000" }, bold: true };
+  var yaHeiRedBold = { name: "微软雅黑", size: 10, color: { argb: "FFFF0000" }, bold: true };
+  var centerAlign = { horizontal: "center", vertical: "middle" };
+  var leftVertMid = { vertical: "middle" };
+  var s3r1 = ws3.getRow(1); s3r1.height = 20;
+  s3r1.getCell(2).value = "此sheet自动计算，勿动";
+  s3r1.getCell(2).font = yaHeiRed; s3r1.getCell(2).alignment = centerAlign;
+  var s3r2 = ws3.getRow(2); s3r2.height = 14.5;
+  var h2 = ["", "测试用例总量", "加权测试失败量", "加权测试成功率", "评估结果", "", "评估结果说明："];
+  h2.forEach(function(v, i) {
+    var c = s3r2.getCell(i + 2);
+    c.value = v;
+    if (v) { c.font = yaHeiBold; c.alignment = centerAlign; c.border = thinBorder; }
+  });
+  var s3r3 = ws3.getRow(3); s3r3.height = 31.5;
+  s3r3.getCell(2).value = stats.totalCases;
+  s3r3.getCell(2).font = yaHeiBold; s3r3.getCell(2).alignment = centerAlign; s3r3.getCell(2).border = thinBorder;
+  s3r3.getCell(3).value = stats.totalWeightedFailures;
+  s3r3.getCell(3).font = yaHeiBold; s3r3.getCell(3).alignment = centerAlign; s3r3.getCell(3).border = thinBorder;
+  s3r3.getCell(4).value = (stats.successRate * 100).toFixed(2) + "%";
+  s3r3.getCell(4).font = yaHeiBold; s3r3.getCell(4).alignment = centerAlign; s3r3.getCell(4).border = thinBorder;
+  s3r3.getCell(5).value = stats.isPass ? "合格" : "不合格";
+  s3r3.getCell(5).font = stats.isPass ? yaHeiGreenBold : yaHeiRedBold;
+  s3r3.getCell(5).alignment = centerAlign; s3r3.getCell(5).border = thinBorder;
+  s3r3.getCell(7).value = "加权测试成功率≥90%，合格；";
+  s3r3.getCell(7).font = yaHeiRedSmall; s3r3.getCell(7).alignment = leftVertMid;
+  var s3r4 = ws3.getRow(4); s3r4.height = 14.5;
+  s3r4.getCell(7).value = "加权测试成功率＜90%，不合格";
+  s3r4.getCell(7).font = yaHeiRedSmall; s3r4.getCell(7).alignment = leftVertMid;
+  ws3.getRow(5).height = 14.5;
+  var s3r6 = ws3.getRow(6); s3r6.height = 14.5;
+  s3r6.getCell(2).value = "各测试类型统计（自动）";
+  s3r6.getCell(2).font = yaHeiBold; s3r6.getCell(2).alignment = centerAlign;
+  var s3r7 = ws3.getRow(7); s3r7.height = 14.5;
+  var statHeaders = ["", "测试类型", "测试量", "测试失败量", "加权系数", "加权测试失败量"];
+  statHeaders.forEach(function(v, i) {
+    var c = s3r7.getCell(i + 2);
+    c.value = v;
+    if (v) { c.font = yaHeiBold; c.alignment = centerAlign; c.border = thinBorder; }
+  });
+  for (var si = 0; si < stats.typeStats.length; si++) {
+    var s = stats.typeStats[si];
+    var rn = 8 + si;
+    var sRow = ws3.getRow(rn); sRow.height = 14.5;
+    sRow.getCell(2).value = s.type; sRow.getCell(2).font = yaHeiFont; sRow.getCell(2).alignment = centerAlign; sRow.getCell(2).border = thinBorder;
+    sRow.getCell(3).value = s.total; sRow.getCell(3).font = yaHeiFont; sRow.getCell(3).alignment = centerAlign; sRow.getCell(3).border = thinBorder;
+    sRow.getCell(4).value = s.failed; sRow.getCell(4).font = yaHeiFont; sRow.getCell(4).alignment = centerAlign; sRow.getCell(4).border = thinBorder;
+    sRow.getCell(5).value = s.weight; sRow.getCell(5).font = yaHeiFont; sRow.getCell(5).alignment = centerAlign; sRow.getCell(5).border = thinBorder;
+    sRow.getCell(6).value = s.weightedFail; sRow.getCell(6).font = yaHeiBold; sRow.getCell(6).alignment = centerAlign; sRow.getCell(6).border = thinBorder;
+  }
+  for (var si = stats.typeStats.length; si < 8; si++) {
+    var rn = 8 + si;
+    var sRow = ws3.getRow(rn); sRow.height = 14.5;
+    sRow.getCell(3).value = 0; sRow.getCell(3).font = yaHeiFont; sRow.getCell(3).alignment = centerAlign; sRow.getCell(3).border = thinBorder;
+    sRow.getCell(4).value = 0; sRow.getCell(4).font = yaHeiFont; sRow.getCell(4).alignment = centerAlign; sRow.getCell(4).border = thinBorder;
+    sRow.getCell(5).value = 50; sRow.getCell(5).font = yaHeiFont; sRow.getCell(5).alignment = centerAlign; sRow.getCell(5).border = thinBorder;
+    sRow.getCell(6).value = 0; sRow.getCell(6).font = yaHeiBold; sRow.getCell(6).alignment = centerAlign; sRow.getCell(6).border = thinBorder;
+  }
+  ws3.getRow(16).height = 14.5;
+  var rn = 17;
+  ws3.getRow(rn).height = 14.5;
+  ws3.getRow(rn).getCell(2).value = "房量"; ws3.getRow(rn).getCell(2).font = yaHeiBold; ws3.getRow(rn).getCell(2).alignment = centerAlign; ws3.getRow(rn).getCell(2).border = thinBorder;
+  ws3.getRow(rn).getCell(3).value = "基础版"; ws3.getRow(rn).getCell(3).font = yaHeiBold; ws3.getRow(rn).getCell(3).alignment = centerAlign; ws3.getRow(rn).getCell(3).border = thinBorder;
+  ws3.getRow(rn).getCell(4).value = "Plus版"; ws3.getRow(rn).getCell(4).font = yaHeiBold; ws3.getRow(rn).getCell(4).alignment = centerAlign; ws3.getRow(rn).getCell(4).border = thinBorder;
+  var rn2 = 18;
+  ws3.getRow(rn2).height = 14.5;
+  ws3.getRow(rn2).getCell(2).value = "0-100"; ws3.getRow(rn2).getCell(2).font = yaHeiFont; ws3.getRow(rn2).getCell(2).alignment = centerAlign; ws3.getRow(rn2).getCell(2).border = thinBorder;
+  ws3.getRow(rn2).getCell(3).value = "✓"; ws3.getRow(rn2).getCell(3).font = yaHeiFont; ws3.getRow(rn2).getCell(3).alignment = centerAlign; ws3.getRow(rn2).getCell(3).border = thinBorder;
+  ws3.getRow(rn2).getCell(4).value = "✓"; ws3.getRow(rn2).getCell(4).font = yaHeiFont; ws3.getRow(rn2).getCell(4).alignment = centerAlign; ws3.getRow(rn2).getCell(4).border = thinBorder;
+  var rn3 = 19;
+  ws3.getRow(rn3).height = 14.5;
+  ws3.getRow(rn3).getCell(2).value = "101-200"; ws3.getRow(rn3).getCell(2).font = yaHeiFont; ws3.getRow(rn3).getCell(2).alignment = centerAlign; ws3.getRow(rn3).getCell(2).border = thinBorder;
+  ws3.getRow(rn3).getCell(3).value = "✓"; ws3.getRow(rn3).getCell(3).font = yaHeiFont; ws3.getRow(rn3).getCell(3).alignment = centerAlign; ws3.getRow(rn3).getCell(3).border = thinBorder;
+  ws3.getRow(rn3).getCell(4).value = "✓"; ws3.getRow(rn3).getCell(4).font = yaHeiFont; ws3.getRow(rn3).getCell(4).alignment = centerAlign; ws3.getRow(rn3).getCell(4).border = thinBorder;
+  var rn4 = 20;
+  ws3.getRow(rn4).height = 14.5;
+  ws3.getRow(rn4).getCell(2).value = "201-300"; ws3.getRow(rn4).getCell(2).font = yaHeiFont; ws3.getRow(rn4).getCell(2).alignment = centerAlign; ws3.getRow(rn4).getCell(2).border = thinBorder;
+  ws3.getRow(rn4).getCell(3).value = "✓"; ws3.getRow(rn4).getCell(3).font = yaHeiFont; ws3.getRow(rn4).getCell(3).alignment = centerAlign; ws3.getRow(rn4).getCell(3).border = thinBorder;
+  ws3.getRow(rn4).getCell(4).value = "✓"; ws3.getRow(rn4).getCell(4).font = yaHeiFont; ws3.getRow(rn4).getCell(4).alignment = centerAlign; ws3.getRow(rn4).getCell(4).border = thinBorder;
+  var rn5 = 21;
+  ws3.getRow(rn5).height = 14.5;
+  ws3.getRow(rn5).getCell(2).value = "301-500"; ws3.getRow(rn5).getCell(2).font = yaHeiFont; ws3.getRow(rn5).getCell(2).alignment = centerAlign; ws3.getRow(rn5).getCell(2).border = thinBorder;
+  ws3.getRow(rn5).getCell(3).value = "✗"; ws3.getRow(rn5).getCell(3).font = yaHeiFont; ws3.getRow(rn5).getCell(3).alignment = centerAlign; ws3.getRow(rn5).getCell(3).border = thinBorder;
+  ws3.getRow(rn5).getCell(4).value = "✓"; ws3.getRow(rn5).getCell(4).font = yaHeiFont; ws3.getRow(rn5).getCell(4).alignment = centerAlign; ws3.getRow(rn5).getCell(4).border = thinBorder;
+  var rn6 = 22;
+  ws3.getRow(rn6).height = 14.5;
+  ws3.getRow(rn6).getCell(2).value = "501-1000"; ws3.getRow(rn6).getCell(2).font = yaHeiFont; ws3.getRow(rn6).getCell(2).alignment = centerAlign; ws3.getRow(rn6).getCell(2).border = thinBorder;
+  ws3.getRow(rn6).getCell(3).value = "✗"; ws3.getRow(rn6).getCell(3).font = yaHeiFont; ws3.getRow(rn6).getCell(3).alignment = centerAlign; ws3.getRow(rn6).getCell(3).border = thinBorder;
+  ws3.getRow(rn6).getCell(4).value = "✓"; ws3.getRow(rn6).getCell(4).font = yaHeiFont; ws3.getRow(rn6).getCell(4).alignment = centerAlign; ws3.getRow(rn6).getCell(4).border = thinBorder;
+  var rn7 = 23;
+  ws3.getRow(rn7).height = 14.5;
+  ws3.getRow(rn7).getCell(2).value = "1001-2000"; ws3.getRow(rn7).getCell(2).font = yaHeiFont; ws3.getRow(rn7).getCell(2).alignment = centerAlign; ws3.getRow(rn7).getCell(2).border = thinBorder;
+  ws3.getRow(rn7).getCell(3).value = "✗"; ws3.getRow(rn7).getCell(3).font = yaHeiFont; ws3.getRow(rn7).getCell(3).alignment = centerAlign; ws3.getRow(rn7).getCell(3).border = thinBorder;
+  ws3.getRow(rn7).getCell(4).value = "✓"; ws3.getRow(rn7).getCell(4).font = yaHeiFont; ws3.getRow(rn7).getCell(4).alignment = centerAlign; ws3.getRow(rn7).getCell(4).border = thinBorder;
+  var rn8 = 24;
+  ws3.getRow(rn8).height = 14.5;
+  ws3.getRow(rn8).getCell(2).value = "2000以上"; ws3.getRow(rn8).getCell(2).font = yaHeiFont; ws3.getRow(rn8).getCell(2).alignment = centerAlign; ws3.getRow(rn8).getCell(2).border = thinBorder;
+  ws3.getRow(rn8).getCell(3).value = "✗"; ws3.getRow(rn8).getCell(3).font = yaHeiFont; ws3.getRow(rn8).getCell(3).alignment = centerAlign; ws3.getRow(rn8).getCell(3).border = thinBorder;
+  ws3.getRow(rn8).getCell(4).value = "✓"; ws3.getRow(rn8).getCell(4).font = yaHeiFont; ws3.getRow(rn8).getCell(4).alignment = centerAlign; ws3.getRow(rn8).getCell(4).border = thinBorder;
+  var buf = await workbook.xlsx.writeBuffer();
+  var blob = new Blob([buf], { type: "application/octet-stream" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  var now = new Date();
+  var dateStr = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0") + "-" + String(now.getDate()).padStart(2,"0");
+  a.download = "AI测试评估报告_" + dateStr + ".xlsx";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  document.getElementById("evalSuccessMsg").innerHTML = "下载成功！格式与原始模板保持一致。";
+  document.getElementById("evalSuccessMsg").style.display = "block";
+}
+
+</script>
+</body>
 </html>
