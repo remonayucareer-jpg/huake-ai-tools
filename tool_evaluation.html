@@ -780,10 +780,8 @@ async function downloadReport() {
 
   showSuccess('报告下载成功！格式与原始模板保持一致。');
 }
-</script>
-</body>
 
-// ============ 解析批量测试报告 ============
+
 function parseBatchForEval(wb) {
   var rows = [];
   var sheetNames = wb.SheetNames;
@@ -1212,7 +1210,6 @@ async function downloadReport() {
   document.getElementById("evalSuccessMsg").innerHTML = "下载成功！格式与原始模板保持一致。";
   document.getElementById("evalSuccessMsg").style.display = "block";
 }
-
 </script>
 </body>
 </html>
