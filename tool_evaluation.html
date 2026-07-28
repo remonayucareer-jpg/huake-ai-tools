@@ -136,8 +136,38 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f
   </div>
 
 
+    <div class="card" id="evalUploadCard">
+      <div class="card-title">第二步：上传两份原始报告（AI测试评估）</div>
+      <div class="upload-area">
+        <div class="upload-box" id="batchEvalBox">
+          <div class="upload-icon"></div>
+          <div class="upload-label">批量批测报告</div>
+          <div class="upload-hint">点击选择或拖拽 .xlsx 文件</div>
+          <input type="file" id="batchEvalFile" accept=".xlsx">
+          <div class="file-info" id="batchEvalInfo"></div>
+        </div>
+        <div class="upload-box" id="opBox">
+          <div class="upload-icon"></div>
+          <div class="upload-label">运营测试记录</div>
+          <div class="upload-hint">点击选择或拖拽 .xlsx 文件</div>
+          <input type="file" id="opFile" accept=".xlsx">
+          <div class="file-info" id="opInfo"></div>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btnGenerateEval" disabled onclick="generateEvalReport()">
+          生成评估报告
+        </button>
+        <button class="btn btn-success hidden" id="btnDownloadEval" onclick="downloadReport()">
+          下载评估报告
+        </button>
+      </div>
+      <div class="error-msg" id="evalErrorMsg"></div>
+      <div class="success-msg" id="evalSuccessMsg"></div>
+    </div>
+
     <div class="card" id="evalResultSection" style="display:none;">
-      <div class="card-title">第二步：AI 测试评估结果（自动计算）</div>
+      <div class="card-title">第三步：AI 测试评估结果（自动计算）</div>
       <div class="stat-grid" id="statGrid"></div>
       <div class="table-wrap" style="max-height:400px;">
         <table>
@@ -163,6 +193,9 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f
 let batchFileObj = null;
 let internalFileObj = null;
 let reportData = null;
+let batchEvalFileObj = null;
+let opFileObj = null;
+let evalData = null;
 
 // ============ File Handlers ============
 document.getElementById('batchFile').addEventListener('change', function(e) {
@@ -183,7 +216,29 @@ document.getElementById('internalFile').addEventListener('change', function(e) {
   checkReady();
 });
 
-['batchBox', 'internalBox'].forEach(id => {
+document.getElementById('batchEvalFile').addEventListener('change', function(e) {
+  if (e.target.files.length > 0) {
+    batchEvalFileObj = e.target.files[0];
+    document.getElementById('batchEvalInfo').textContent = batchEvalFileObj.name;
+    document.getElementById('batchEvalBox').classList.add('has-file');
+  }
+  checkEvalReady();
+});
+
+document.getElementById('opFile').addEventListener('change', function(e) {
+  if (e.target.files.length > 0) {
+    opFileObj = e.target.files[0];
+    document.getElementById('opInfo').textContent = opFileObj.name;
+    document.getElementById('opBox').classList.add('has-file');
+  }
+  checkEvalReady();
+});
+
+function checkEvalReady() {
+  document.getElementById('btnGenerateEval').disabled = !(batchEvalFileObj && opFileObj);
+}
+
+['batchBox', 'internalBox', 'batchEvalBox', 'opBox'].forEach(id => {
   const box = document.getElementById(id);
   box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('dragover'); });
   box.addEventListener('dragleave', () => box.classList.remove('dragover'));
@@ -967,7 +1022,7 @@ function computeStats(rows) {
 async function generateEvalReport() {
   document.getElementById("evalErrorMsg").style.display = "none";
   document.getElementById("evalSuccessMsg").style.display = "none";
-  if (!batchFileObj || !opFileObj) {
+  if (!batchEvalFileObj || !opFileObj) {
     document.getElementById("evalErrorMsg").textContent = "请先上传两份报告文件";
     document.getElementById("evalErrorMsg").style.display = "block";
     return;
@@ -976,7 +1031,7 @@ async function generateEvalReport() {
   btn.disabled = true;
   btn.textContent = "处理中...";
   try {
-    var batchBuffer = await readFileAsArrayBuffer(batchFileObj);
+    var batchBuffer = await readFileAsArrayBuffer(batchEvalFileObj);
     var batchWb = XLSX.read(batchBuffer, { type: "array" });
     var batchRows = parseBatchForEval(batchWb);
     var opBuffer = await readFileAsArrayBuffer(opFileObj);
