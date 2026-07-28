@@ -758,15 +758,14 @@ document.getElementById('btnDownloadEval').addEventListener('click', async funct
   }
 
   // =========== Sheet 3: 评估标准及结果 ===========
-  var ws3 = workbook.addWorksheet('评估标准及结果');
-  ws3.getColumn(1).width = 2.1796875;
-  ws3.getColumn(2).width = 21.54296875;
-  ws3.getColumn(3).width = 15.08984375;
-  ws3.getColumn(4).width = 15.6328125;
-  ws3.getColumn(5).width = 14.453125;
-  ws3.getColumn(6).width = 17.08984375;
-  ws3.getColumn(7).width = 53.08984375;
-  ws3.getColumn(8).width = 13.81640625;
+    var ws3 = workbook.addWorksheet('评估标准及结果');
+  ws3.getColumn(1).width = 21.54296875;
+  ws3.getColumn(2).width = 15.08984375;
+  ws3.getColumn(3).width = 15.6328125;
+  ws3.getColumn(4).width = 14.453125;
+  ws3.getColumn(5).width = 17.08984375;
+  ws3.getColumn(6).width = 53.08984375;
+  ws3.getColumn(7).width = 13.81640625;
 
   var yaHeiFont = { name: '微软雅黑', size: 10 };
   var yaHeiBold = { name: '微软雅黑', size: 10, bold: true };
@@ -778,44 +777,44 @@ document.getElementById('btnDownloadEval').addEventListener('click', async funct
   var leftVertMid = { vertical: 'middle' };
 
   var s3r1 = ws3.getRow(1); s3r1.height = 20;
-  s3r1.getCell(2).value = '此sheet自动计算，勿动';
-  s3r1.getCell(2).font = yaHeiRed; s3r1.getCell(2).alignment = centerAlign;
+  s3r1.getCell(1).value = '此sheet自动计算，勿动';
+  s3r1.getCell(1).font = yaHeiRed; s3r1.getCell(1).alignment = centerAlign;
 
   var s3r2 = ws3.getRow(2); s3r2.height = 14.5;
-  var h2 = ['', '测试用例总量', '加权测试失败量', '加权测试成功率', '评估结果', '', '评估结果说明：'];
+  var h2 = ['测试用例总量', '加权测试失败量', '加权测试成功率', '评估结果', '评估结果说明：'];
   h2.forEach(function(v, i) {
-    var c = s3r2.getCell(i + 2);
+    var c = s3r2.getCell(i + 1);
     c.value = v;
     if (v) { c.font = yaHeiBold; c.alignment = centerAlign; c.border = thinBorder; }
   });
 
   var s3r3 = ws3.getRow(3); s3r3.height = 31.5;
-  s3r3.getCell(2).value = stats.totalCases;
+  s3r3.getCell(1).value = stats.totalCases;
+  s3r3.getCell(1).font = yaHeiBold; s3r3.getCell(1).alignment = centerAlign; s3r3.getCell(1).border = thinBorder;
+  s3r3.getCell(2).value = stats.totalWeightedFailures;
   s3r3.getCell(2).font = yaHeiBold; s3r3.getCell(2).alignment = centerAlign; s3r3.getCell(2).border = thinBorder;
-  s3r3.getCell(3).value = stats.totalWeightedFailures;
+  s3r3.getCell(3).value = (stats.successRate * 100).toFixed(2) + '%';
   s3r3.getCell(3).font = yaHeiBold; s3r3.getCell(3).alignment = centerAlign; s3r3.getCell(3).border = thinBorder;
-  s3r3.getCell(4).value = (stats.successRate * 100).toFixed(2) + '%';
-  s3r3.getCell(4).font = yaHeiBold; s3r3.getCell(4).alignment = centerAlign; s3r3.getCell(4).border = thinBorder;
-  s3r3.getCell(5).value = stats.isPass ? '合格' : '不合格';
-  s3r3.getCell(5).font = stats.isPass ? yaHeiGreenBold : yaHeiRedBold;
-  s3r3.getCell(5).alignment = centerAlign; s3r3.getCell(5).border = thinBorder;
-  s3r3.getCell(7).value = '加权测试成功率≥90%，合格；';
-  s3r3.getCell(7).font = yaHeiRedSmall; s3r3.getCell(7).alignment = leftVertMid;
+  s3r3.getCell(4).value = stats.isPass ? '合格' : '不合格';
+  s3r3.getCell(4).font = stats.isPass ? yaHeiGreenBold : yaHeiRedBold;
+  s3r3.getCell(4).alignment = centerAlign; s3r3.getCell(4).border = thinBorder;
+  s3r3.getCell(5).value = '加权测试成功率≥90%，合格；';
+  s3r3.getCell(5).font = yaHeiRedSmall; s3r3.getCell(5).alignment = leftVertMid;
 
   var s3r4 = ws3.getRow(4); s3r4.height = 14.5;
-  s3r4.getCell(7).value = '加权测试成功率＜90%，不合格';
-  s3r4.getCell(7).font = yaHeiRedSmall; s3r4.getCell(7).alignment = leftVertMid;
+  s3r4.getCell(5).value = '加权测试成功率＜90%，不合格';
+  s3r4.getCell(5).font = yaHeiRedSmall; s3r4.getCell(5).alignment = leftVertMid;
 
   ws3.getRow(5).height = 14.5;
 
   var s3r6 = ws3.getRow(6); s3r6.height = 14.5;
-  s3r6.getCell(2).value = '各测试类型统计（自动）';
-  s3r6.getCell(2).font = yaHeiBold; s3r6.getCell(2).alignment = centerAlign;
+  s3r6.getCell(1).value = '各测试类型统计（自动）';
+  s3r6.getCell(1).font = yaHeiBold; s3r6.getCell(1).alignment = centerAlign;
 
   var s3r7 = ws3.getRow(7); s3r7.height = 14.5;
-  var statHeaders = ['', '测试类型', '测试量', '测试失败量', '加权系数', '加权测试失败量'];
+  var statHeaders = ['测试类型', '测试量', '测试失败量', '加权系数', '加权测试失败量'];
   statHeaders.forEach(function(v, i) {
-    var c = s3r7.getCell(i + 2);
+    var c = s3r7.getCell(i + 1);
     c.value = v;
     if (v) { c.font = yaHeiBold; c.alignment = centerAlign; c.border = thinBorder; }
   });
@@ -824,50 +823,23 @@ document.getElementById('btnDownloadEval').addEventListener('click', async funct
     var s = stats.typeStats[si];
     var rn = 8 + si;
     var sRow = ws3.getRow(rn); sRow.height = 14.5;
-    sRow.getCell(2).value = s.type; sRow.getCell(2).font = yaHeiFont; sRow.getCell(2).alignment = centerAlign; sRow.getCell(2).border = thinBorder;
-    sRow.getCell(3).value = s.total; sRow.getCell(3).font = yaHeiFont; sRow.getCell(3).alignment = centerAlign; sRow.getCell(3).border = thinBorder;
-    sRow.getCell(4).value = s.failed; sRow.getCell(4).font = yaHeiFont; sRow.getCell(4).alignment = centerAlign; sRow.getCell(4).border = thinBorder;
-    sRow.getCell(5).value = s.weight; sRow.getCell(5).font = yaHeiFont; sRow.getCell(5).alignment = centerAlign; sRow.getCell(5).border = thinBorder;
-    sRow.getCell(6).value = s.weightedFail; sRow.getCell(6).font = yaHeiBold; sRow.getCell(6).alignment = centerAlign; sRow.getCell(6).border = thinBorder;
+    sRow.getCell(1).value = s.type; sRow.getCell(1).font = yaHeiFont; sRow.getCell(1).alignment = centerAlign; sRow.getCell(1).border = thinBorder;
+    sRow.getCell(2).value = s.total; sRow.getCell(2).font = yaHeiFont; sRow.getCell(2).alignment = centerAlign; sRow.getCell(2).border = thinBorder;
+    sRow.getCell(3).value = s.failed; sRow.getCell(3).font = yaHeiFont; sRow.getCell(3).alignment = centerAlign; sRow.getCell(3).border = thinBorder;
+    sRow.getCell(4).value = s.weight; sRow.getCell(4).font = yaHeiFont; sRow.getCell(4).alignment = centerAlign; sRow.getCell(4).border = thinBorder;
+    sRow.getCell(5).value = s.weightedFail; sRow.getCell(5).font = yaHeiBold; sRow.getCell(5).alignment = centerAlign; sRow.getCell(5).border = thinBorder;
   }
 
   for (var si = stats.typeStats.length; si < 8; si++) {
     var rn = 8 + si;
     var sRow = ws3.getRow(rn); sRow.height = 14.5;
+    sRow.getCell(2).value = 0; sRow.getCell(2).font = yaHeiFont; sRow.getCell(2).alignment = centerAlign; sRow.getCell(2).border = thinBorder;
     sRow.getCell(3).value = 0; sRow.getCell(3).font = yaHeiFont; sRow.getCell(3).alignment = centerAlign; sRow.getCell(3).border = thinBorder;
-    sRow.getCell(4).value = 0; sRow.getCell(4).font = yaHeiFont; sRow.getCell(4).alignment = centerAlign; sRow.getCell(4).border = thinBorder;
-    sRow.getCell(5).value = 50; sRow.getCell(5).font = yaHeiFont; sRow.getCell(5).alignment = centerAlign; sRow.getCell(5).border = thinBorder;
-    sRow.getCell(6).value = 0; sRow.getCell(6).font = yaHeiBold; sRow.getCell(6).alignment = centerAlign; sRow.getCell(6).border = thinBorder;
+    sRow.getCell(4).value = 50; sRow.getCell(4).font = yaHeiFont; sRow.getCell(4).alignment = centerAlign; sRow.getCell(4).border = thinBorder;
+    sRow.getCell(5).value = 0; sRow.getCell(5).font = yaHeiBold; sRow.getCell(5).alignment = centerAlign; sRow.getCell(5).border = thinBorder;
   }
 
-  ws3.getRow(16).height = 14.5;
-
-  // 房量表格
-  var rn = 17;
-  ws3.getRow(rn).height = 14.5;
-  ws3.getRow(rn).getCell(2).value = '房量'; ws3.getRow(rn).getCell(2).font = yaHeiBold; ws3.getRow(rn).getCell(2).alignment = centerAlign; ws3.getRow(rn).getCell(2).border = thinBorder;
-  ws3.getRow(rn).getCell(3).value = '基础版'; ws3.getRow(rn).getCell(3).font = yaHeiBold; ws3.getRow(rn).getCell(3).alignment = centerAlign; ws3.getRow(rn).getCell(3).border = thinBorder;
-  ws3.getRow(rn).getCell(4).value = 'Plus版'; ws3.getRow(rn).getCell(4).font = yaHeiBold; ws3.getRow(rn).getCell(4).alignment = centerAlign; ws3.getRow(rn).getCell(4).border = thinBorder;
-
-  rn = 18;
-  ws3.getRow(rn).height = 14.5;
-  ws3.getRow(rn).getCell(2).value = '＜300'; ws3.getRow(rn).getCell(2).font = yaHeiFont; ws3.getRow(rn).getCell(2).alignment = centerAlign; ws3.getRow(rn).getCell(2).border = thinBorder;
-  ws3.getRow(rn).getCell(3).value = '√'; ws3.getRow(rn).getCell(3).font = yaHeiFont; ws3.getRow(rn).getCell(3).alignment = centerAlign; ws3.getRow(rn).getCell(3).border = thinBorder;
-  ws3.getRow(rn).getCell(4).value = '-'; ws3.getRow(rn).getCell(4).font = yaHeiFont; ws3.getRow(rn).getCell(4).alignment = centerAlign; ws3.getRow(rn).getCell(4).border = thinBorder;
-
-  rn = 19;
-  ws3.getRow(rn).height = 14.5;
-  ws3.getRow(rn).getCell(2).value = '300~500'; ws3.getRow(rn).getCell(2).font = yaHeiFont; ws3.getRow(rn).getCell(2).alignment = centerAlign; ws3.getRow(rn).getCell(2).border = thinBorder;
-  ws3.getRow(rn).getCell(3).value = 'x'; ws3.getRow(rn).getCell(3).font = yaHeiFont; ws3.getRow(rn).getCell(3).alignment = centerAlign; ws3.getRow(rn).getCell(3).border = thinBorder;
-  ws3.getRow(rn).getCell(4).value = '√'; ws3.getRow(rn).getCell(4).font = yaHeiFont; ws3.getRow(rn).getCell(4).alignment = centerAlign; ws3.getRow(rn).getCell(4).border = thinBorder;
-
-  rn = 20;
-  ws3.getRow(rn).height = 14.5;
-  ws3.getRow(rn).getCell(2).value = '＞500'; ws3.getRow(rn).getCell(2).font = yaHeiFont; ws3.getRow(rn).getCell(2).alignment = centerAlign; ws3.getRow(rn).getCell(2).border = thinBorder;
-  ws3.getRow(rn).getCell(3).value = '-'; ws3.getRow(rn).getCell(3).font = yaHeiFont; ws3.getRow(rn).getCell(3).alignment = centerAlign; ws3.getRow(rn).getCell(3).border = thinBorder;
-  ws3.getRow(rn).getCell(4).value = '√'; ws3.getRow(rn).getCell(4).font = yaHeiFont; ws3.getRow(rn).getCell(4).alignment = centerAlign; ws3.getRow(rn).getCell(4).border = thinBorder;
-
-  // 保存并下载
+  ws3.getRow(16).height = 14.5;// 保存并下载
   var buffer = await workbook.xlsx.writeBuffer();
   var blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   var url = URL.createObjectURL(blob);
