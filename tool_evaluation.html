@@ -525,14 +525,12 @@ function computeStats(rows) {
   var totalWeightedFailures = 0;
 
   typeOrder.forEach(function(t) {
-    if (merged[t]) {
-      var s = merged[t];
-      var w = weights[t] || 1;
-      var wf = s.failed * w;
-      totalCases += s.total;
-      totalWeightedFailures += wf;
-      orderedStats.push({ type: t, total: s.total, failed: s.failed, weight: w, weightedFail: wf });
-    }
+    var s = merged[t] || { total: 0, failed: 0 };
+    var w = weights[t] || 1;
+    var wf = s.failed * w;
+    totalCases += s.total;
+    totalWeightedFailures += wf;
+    orderedStats.push({ type: t, total: s.total, failed: s.failed, weight: w, weightedFail: wf });
   });
 
   for (var t in merged) {
@@ -758,7 +756,7 @@ document.getElementById('btnDownloadEval').addEventListener('click', async funct
   }
 
   // =========== Sheet 3: 评估标准及结果 ===========
-    var ws3 = workbook.addWorksheet('评估标准及结果');
+      var ws3 = workbook.addWorksheet('评估标准及结果');
   ws3.getColumn(1).width = 21.54296875;
   ws3.getColumn(2).width = 15.08984375;
   ws3.getColumn(3).width = 15.6328125;
@@ -774,12 +772,14 @@ document.getElementById('btnDownloadEval').addEventListener('click', async funct
   var yaHeiGreenBold = { name: '微软雅黑', size: 10, color: { argb: 'FF008000' }, bold: true };
   var yaHeiRedBold = { name: '微软雅黑', size: 10, color: { argb: 'FFFF0000' }, bold: true };
   var centerAlign = { horizontal: 'center', vertical: 'middle' };
+  var leftAlign = { horizontal: 'left', vertical: 'middle' };
   var leftVertMid = { vertical: 'middle' };
 
   var s3r1 = ws3.getRow(1); s3r1.height = 20;
   s3r1.getCell(1).value = '此sheet自动计算，勿动';
   s3r1.getCell(1).font = yaHeiRed; s3r1.getCell(1).alignment = centerAlign;
 
+  // 第2行：表头 - 评估结果说明独立占一个单元格
   var s3r2 = ws3.getRow(2); s3r2.height = 14.5;
   var h2 = ['测试用例总量', '加权测试失败量', '加权测试成功率', '评估结果', '评估结果说明：'];
   h2.forEach(function(v, i) {
@@ -788,6 +788,7 @@ document.getElementById('btnDownloadEval').addEventListener('click', async funct
     if (v) { c.font = yaHeiBold; c.alignment = centerAlign; c.border = thinBorder; }
   });
 
+  // 第3行：数据行
   var s3r3 = ws3.getRow(3); s3r3.height = 31.5;
   s3r3.getCell(1).value = stats.totalCases;
   s3r3.getCell(1).font = yaHeiBold; s3r3.getCell(1).alignment = centerAlign; s3r3.getCell(1).border = thinBorder;
@@ -798,19 +799,23 @@ document.getElementById('btnDownloadEval').addEventListener('click', async funct
   s3r3.getCell(4).value = stats.isPass ? '合格' : '不合格';
   s3r3.getCell(4).font = stats.isPass ? yaHeiGreenBold : yaHeiRedBold;
   s3r3.getCell(4).alignment = centerAlign; s3r3.getCell(4).border = thinBorder;
+  // 评估结果说明文字放在第3行E列（与表头对齐）
   s3r3.getCell(5).value = '加权测试成功率≥90%，合格；';
   s3r3.getCell(5).font = yaHeiRedSmall; s3r3.getCell(5).alignment = leftVertMid;
 
+  // 第4行：评估结果说明第2行
   var s3r4 = ws3.getRow(4); s3r4.height = 14.5;
   s3r4.getCell(5).value = '加权测试成功率＜90%，不合格';
   s3r4.getCell(5).font = yaHeiRedSmall; s3r4.getCell(5).alignment = leftVertMid;
 
   ws3.getRow(5).height = 14.5;
 
+  // 第6行：各测试类型统计标题
   var s3r6 = ws3.getRow(6); s3r6.height = 14.5;
   s3r6.getCell(1).value = '各测试类型统计（自动）';
   s3r6.getCell(1).font = yaHeiBold; s3r6.getCell(1).alignment = centerAlign;
 
+  // 第7行：统计表头
   var s3r7 = ws3.getRow(7); s3r7.height = 14.5;
   var statHeaders = ['测试类型', '测试量', '测试失败量', '加权系数', '加权测试失败量'];
   statHeaders.forEach(function(v, i) {
@@ -819,27 +824,22 @@ document.getElementById('btnDownloadEval').addEventListener('click', async funct
     if (v) { c.font = yaHeiBold; c.alignment = centerAlign; c.border = thinBorder; }
   });
 
+  // 数据行：测试类型左对齐，数值居中对齐
   for (var si = 0; si < stats.typeStats.length; si++) {
     var s = stats.typeStats[si];
     var rn = 8 + si;
     var sRow = ws3.getRow(rn); sRow.height = 14.5;
-    sRow.getCell(1).value = s.type; sRow.getCell(1).font = yaHeiFont; sRow.getCell(1).alignment = centerAlign; sRow.getCell(1).border = thinBorder;
+    sRow.getCell(1).value = s.type; sRow.getCell(1).font = yaHeiFont; sRow.getCell(1).alignment = leftAlign; sRow.getCell(1).border = thinBorder;
     sRow.getCell(2).value = s.total; sRow.getCell(2).font = yaHeiFont; sRow.getCell(2).alignment = centerAlign; sRow.getCell(2).border = thinBorder;
     sRow.getCell(3).value = s.failed; sRow.getCell(3).font = yaHeiFont; sRow.getCell(3).alignment = centerAlign; sRow.getCell(3).border = thinBorder;
     sRow.getCell(4).value = s.weight; sRow.getCell(4).font = yaHeiFont; sRow.getCell(4).alignment = centerAlign; sRow.getCell(4).border = thinBorder;
     sRow.getCell(5).value = s.weightedFail; sRow.getCell(5).font = yaHeiBold; sRow.getCell(5).alignment = centerAlign; sRow.getCell(5).border = thinBorder;
   }
 
-  for (var si = stats.typeStats.length; si < 8; si++) {
-    var rn = 8 + si;
-    var sRow = ws3.getRow(rn); sRow.height = 14.5;
-    sRow.getCell(2).value = 0; sRow.getCell(2).font = yaHeiFont; sRow.getCell(2).alignment = centerAlign; sRow.getCell(2).border = thinBorder;
-    sRow.getCell(3).value = 0; sRow.getCell(3).font = yaHeiFont; sRow.getCell(3).alignment = centerAlign; sRow.getCell(3).border = thinBorder;
-    sRow.getCell(4).value = 50; sRow.getCell(4).font = yaHeiFont; sRow.getCell(4).alignment = centerAlign; sRow.getCell(4).border = thinBorder;
-    sRow.getCell(5).value = 0; sRow.getCell(5).font = yaHeiBold; sRow.getCell(5).alignment = centerAlign; sRow.getCell(5).border = thinBorder;
-  }
-
-  ws3.getRow(16).height = 14.5;// 保存并下载
+  // 不再填充空行（已删除底部冗余行）
+  // 计算最后一行位置
+  var lastDataRow = 7 + stats.typeStats.length;
+  ws3.getRow(lastDataRow + 1).height = 14.5;// 保存并下载
   var buffer = await workbook.xlsx.writeBuffer();
   var blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   var url = URL.createObjectURL(blob);
