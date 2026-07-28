@@ -135,6 +135,26 @@ body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f
     </div>
   </div>
 
+
+    <div class="card" id="evalResultSection" style="display:none;">
+      <div class="card-title">第二步：AI 测试评估结果（自动计算）</div>
+      <div class="stat-grid" id="statGrid"></div>
+      <div class="table-wrap" style="max-height:400px;">
+        <table>
+          <thead><tr><th>测试类型</th><th>测试量</th><th>测试失败量</th><th>加权系数</th><th>加权测试失败量</th></tr></thead>
+          <tbody id="evalTableBody"></tbody>
+        </table>
+      </div>
+      <div class="note" style="margin-top:8px;font-size:13px;color:#666;">
+        加权测试成功率 &ge; 90% 为合格，< 90% 为不合格
+      </div>
+      <div class="btn-group" style="margin-top:12px;">
+        <button class="btn btn-primary" id="btnDownloadEval" onclick="downloadReport()">下载评估报告</button>
+      </div>
+      <div class="success-msg" id="evalSuccessMsg" style="display:none;"></div>
+      <div class="error-msg" id="evalErrorMsg" style="display:none;"></div>
+    </div>
+
 </div>
 
 <div class="footer">华科 AI 测试评估报告自动生成工具 v2.0</div>
