@@ -1026,7 +1026,7 @@ function renderEvalResults(rows, stats) {
 }
 
 // ============ 下载评估报告 ============
-async function downloadReport() {
+async async function downloadReport() {
   if (!evalData) {
     document.getElementById("evalErrorMsg").textContent = "请先生成评估报告";
     document.getElementById("evalErrorMsg").style.display = "block";
