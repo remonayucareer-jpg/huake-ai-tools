@@ -524,6 +524,7 @@ function computeStats(rows) {
   var totalCases = 0;
   var totalWeightedFailures = 0;
 
+  // 始终按 typeOrder 顺序显示全部8种类型，即使数据中不存在也显示为0
   typeOrder.forEach(function(t) {
     var s = merged[t] || { total: 0, failed: 0 };
     var w = weights[t] || 1;
@@ -533,6 +534,7 @@ function computeStats(rows) {
     orderedStats.push({ type: t, total: s.total, failed: s.failed, weight: w, weightedFail: wf });
   });
 
+  // 处理 typeOrder 之外的其他类型（如果有）
   for (var t in merged) {
     if (typeOrder.indexOf(t) < 0) {
       var s = merged[t];
